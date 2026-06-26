@@ -17,9 +17,19 @@
         <header class="publicHeader">
             <div class="headerContent">
                 <div class="logo">
-                    <img src="35af9257-2123-4413-82c3-290cfd84b8f5.webp" alt="Internal Affairs" class="headerLogo" />
+                    <div class="logoWrapper">
+                        <div class="logoText">
+                            <span class="logoLine">INTERNAL</span>
+                            <span class="logoLine">AFFAIRS</span>
+                            <span class="logoLine small">DIVISION</span>
+                        </div>
+                        <div class="logoShield">🛡️</div>
+                    </div>
                     <span class="brandName">Crimson Police</span>
                     <span class="brandSub">الشؤون الداخلية</span>
+                </div>
+                <div class="headerImage">
+                    <img src="3D8JxSy.webp" alt="Internal Affairs" />
                 </div>
             </div>
         </header>
@@ -29,14 +39,22 @@
                 <div class="complaintCard">
                     <div class="cardIcon">📋</div>
                     <h1>رفع قضية</h1>
-                    <p class="subText">للمواطنين - بدون تسجيل دخول</p>
+                    <p class="subText">اختر نوع القضية</p>
 
-                    <div class="complaintForm">
+                    <div class="complaintTypeSelector">
+                        <button class="complaintTypeBtn active" onclick="selectComplaintType('citizen')">
+                            <i class="fas fa-user"></i> قضية مواطن
+                        </button>
+                        <button class="complaintTypeBtn" onclick="selectComplaintType('military')">
+                            <i class="fas fa-shield-alt"></i> قضية عسكرية
+                        </button>
+                    </div>
+
+                    <div id="citizenComplaintForm" class="complaintForm">
                         <div class="formGroup">
                             <label><i class="fas fa-user"></i> الاسم الكامل</label>
                             <input type="text" id="citizenName" placeholder="أدخل اسمك الكامل" />
                         </div>
-
                         <div class="formGroup">
                             <label><i class="fas fa-tag"></i> نوع القضية</label>
                             <select id="complaintType">
@@ -46,18 +64,41 @@
                                 <option value="اقتراح">اقتراح</option>
                             </select>
                         </div>
-
                         <div class="formGroup">
                             <label><i class="fas fa-pen"></i> تفاصيل القضية</label>
                             <textarea id="complaintDesc" placeholder="اكتب تفاصيل قضيتك هنا..."></textarea>
                         </div>
-
                         <button onclick="submitPublicComplaint()" class="btnSubmit">
                             <i class="fas fa-paper-plane"></i> رفع القضية
                         </button>
-
-                        <div id="complaintStatus" class="statusMessage"></div>
                     </div>
+
+                    <div id="militaryComplaintForm" class="complaintForm" style="display:none;">
+                        <div class="formGroup">
+                            <label><i class="fas fa-id-badge"></i> اسم العسكري</label>
+                            <input type="text" id="militaryName" placeholder="أدخل اسم العسكري" />
+                        </div>
+                        <div class="formGroup">
+                            <label><i class="fas fa-tag"></i> نوع القضية</label>
+                            <select id="militaryComplaintType">
+                                <option value="تجاوز">تجاوز</option>
+                                <option value="تقصير">تقصير</option>
+                                <option value="تلاعب">تلاعب</option>
+                                <option value="فساد إداري">فساد إداري</option>
+                                <option value="تزوير">تزوير</option>
+                                <option value="شكوى داخلية">شكوى داخلية</option>
+                            </select>
+                        </div>
+                        <div class="formGroup">
+                            <label><i class="fas fa-pen"></i> تفاصيل القضية</label>
+                            <textarea id="militaryComplaintDesc" placeholder="اكتب تفاصيل القضية العسكرية هنا..."></textarea>
+                        </div>
+                        <button onclick="submitMilitaryComplaint()" class="btnSubmit">
+                            <i class="fas fa-paper-plane"></i> رفع القضية
+                        </button>
+                    </div>
+
+                    <div id="complaintStatus" class="statusMessage"></div>
 
                     <div class="adminLink">
                         <span>🔒</span>
@@ -77,12 +118,24 @@
     <!-- ========================================================= -->
     <div id="adminLoginScreen" style="display:none;">
         <div class="loginWrapper">
+            <div class="loginBackground">
+                <div class="bgOrb orb1"></div>
+                <div class="bgOrb orb2"></div>
+                <div class="bgOrb orb3"></div>
+            </div>
             <div class="loginBox">
-                <div class="loginLogo">
-                    <img src="35af9257-2123-4413-82c3-290cfd84b8f5.webp" alt="Internal Affairs" />
+                <div class="loginGlow"></div>
+                <div class="loginLogoWrapper">
+                    <div class="loginLogoText">
+                        <span class="logoLine">INTERNAL</span>
+                        <span class="logoLine">AFFAIRS</span>
+                        <span class="logoLine small">DIVISION</span>
+                    </div>
+                    <div class="loginLogoShield">🛡️</div>
                 </div>
                 <h1>نظام الشؤون الداخلية</h1>
-                <p>Crimson Police</p>
+                <p class="loginSub">Crimson Police · Internal Affairs</p>
+                <div class="loginDivider"></div>
 
                 <div class="loginMethod">
                     <button class="methodBtn active" onclick="switchLoginMethod('password')">
@@ -94,13 +147,25 @@
                 </div>
 
                 <div id="loginMethodPassword">
-                    <input type="password" id="passwordInput" placeholder="كلمة المرور" />
-                    <button onclick="adminLogin()">دخول</button>
+                    <div class="inputWrapper">
+                        <i class="fas fa-lock inputIcon"></i>
+                        <input type="password" id="passwordInput" placeholder="كلمة المرور" />
+                    </div>
+                    <button onclick="adminLogin()" class="loginBtn">
+                        <span>دخول</span>
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
                 </div>
 
                 <div id="loginMethodCode" style="display:none;">
-                    <input type="text" id="accessCodeInput" placeholder="أدخل رمز الدخول" />
-                    <button onclick="loginWithCode()">دخول</button>
+                    <div class="inputWrapper">
+                        <i class="fas fa-key inputIcon"></i>
+                        <input type="text" id="accessCodeInput" placeholder="أدخل رمز الدخول" />
+                    </div>
+                    <button onclick="loginWithCode()" class="loginBtn">
+                        <span>دخول</span>
+                        <i class="fas fa-arrow-left"></i>
+                    </button>
                 </div>
 
                 <div id="loginError" class="errorMsg"></div>
@@ -108,11 +173,46 @@
                     <a href="#" onclick="showPublicPage()">← العودة لرفع القضية</a>
                 </div>
 
-                <div class="loginDateTime" id="loginDateTime">
+                <div class="loginDateTime">
                     <span id="currentTimeDisplay">--:-- --</span>
                     <span style="margin:0 6px;">|</span>
                     <span id="currentDateDisplay">----/--/--</span>
                 </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- ===== ترحيب ===== -->
+    <!-- ========================================================= -->
+    <div id="welcomeOverlay" style="display:none;">
+        <div class="welcomeContent">
+            <div class="welcomeIcon">🛡️</div>
+            <h1 class="welcomeTitle">مرحباً بك</h1>
+            <p class="welcomeSub">في الشؤون الداخلية</p>
+            <p class="welcomeName" id="welcomeNameDisplay"></p>
+            <div class="welcomeSparkles">
+                <span>✨</span>
+                <span>⭐</span>
+                <span>✨</span>
+                <span>⭐</span>
+                <span>✨</span>
+            </div>
+            <button onclick="closeWelcome()" class="welcomeBtn">متابعة</button>
+        </div>
+    </div>
+
+    <!-- ========================================================= -->
+    <!-- ===== نافذة عرض القضية كاملة ===== -->
+    <!-- ========================================================= -->
+    <div id="complaintModal" style="display:none;">
+        <div class="modalOverlay">
+            <div class="modalContent">
+                <div class="modalHeader">
+                    <h2><i class="fas fa-file-alt"></i> تفاصيل القضية</h2>
+                    <button onclick="closeComplaintModal()" class="modalClose">&times;</button>
+                </div>
+                <div class="modalBody" id="complaintModalBody"></div>
             </div>
         </div>
     </div>
@@ -124,7 +224,10 @@
 
         <nav class="navbar">
             <div class="navBrand">
-                <img src="35af9257-2123-4413-82c3-290cfd84b8f5.webp" alt="IA" class="navLogo" />
+                <div class="navLogoWrapper">
+                    <span class="navLogoShield">🛡️</span>
+                    <span class="navLogoText">IA</span>
+                </div>
                 <span>الشؤون الداخلية</span>
                 <span class="badge">HEAD</span>
             </div>
@@ -142,11 +245,14 @@
             <button class="tabBtn" data-tab="tabHome" onclick="switchTab('tabHome')">
                 <i class="fas fa-home"></i> الرئيسية
             </button>
-            <button class="tabBtn" data-tab="tabAccess" onclick="switchTab('tabAccess')">
-                <i class="fas fa-key"></i> رموز الدخول
+            <button class="tabBtn" data-tab="tabComplaintLog" onclick="switchTab('tabComplaintLog')">
+                <i class="fas fa-search"></i> سجل استلام القضايا
             </button>
             <button class="tabBtn" data-tab="tabSoldiers" onclick="switchTab('tabSoldiers')">
                 <i class="fas fa-users"></i> العساكر
+            </button>
+            <button class="tabBtn" data-tab="tabAccess" onclick="switchTab('tabAccess')">
+                <i class="fas fa-key"></i> رموز الدخول
             </button>
             <button class="tabBtn" data-tab="tabComplaints" onclick="switchTab('tabComplaints')">
                 <i class="fas fa-gavel"></i> القضايا
@@ -231,7 +337,65 @@
             </section>
         </div>
 
-        <!-- ===== التبويب 3: رموز الدخول ===== -->
+        <!-- ===== التبويب 3: سجل استلام القضايا ===== -->
+        <div id="tabComplaintLog" class="tabContent">
+            <section class="card">
+                <h2><i class="fas fa-search"></i> سجل استلام القضايا</h2>
+                <p class="sub">ابحث عن شخص لمعرفة عدد القضايا التي استلمها</p>
+                <div class="searchForm">
+                    <div class="row">
+                        <input type="text" id="searchPersonName" placeholder="أدخل اسم الشخص" />
+                        <button onclick="searchPersonComplaints()" class="btnSearch"><i class="fas fa-search"></i> بحث</button>
+                    </div>
+                    <button onclick="showAllComplaintLog()" class="btnShowAll"><i class="fas fa-list"></i> عرض الكل</button>
+                </div>
+                <div id="complaintLogResult" class="listBox" style="margin-top:15px;"></div>
+            </section>
+        </div>
+
+        <!-- ===== التبويب 4: العساكر ===== -->
+        <div id="tabSoldiers" class="tabContent">
+            <section class="card">
+                <h2><i class="fas fa-users"></i> العساكر</h2>
+                <p class="sub">إدارة العساكر مع النقاط والساعات</p>
+
+                <div class="rankRequirements">
+                    <h3 style="color:#888;font-size:14px;margin-bottom:10px;">📊 متطلبات الترقيات</h3>
+                    <div class="requirementsGrid">
+                        <div class="reqItem"><span class="reqRank">Officer I</span><span class="reqInfo">250 نقطة + 15 ساعة</span></div>
+                        <div class="reqItem"><span class="reqRank">Officer II</span><span class="reqInfo">400 نقطة + 15 ساعة</span></div>
+                        <div class="reqItem"><span class="reqRank">Officer III</span><span class="reqInfo">600 نقطة + 20 ساعة</span></div>
+                        <div class="reqItem"><span class="reqRank">Senior Officer</span><span class="reqInfo">900 نقطة + 20 ساعة</span></div>
+                        <div class="reqItem"><span class="reqRank">Sergeant</span><span class="reqInfo">1100 نقطة + 20 ساعة</span></div>
+                        <div class="reqItem"><span class="reqRank">First Sergeant</span><span class="reqInfo">1400 نقطة + 20 ساعة</span></div>
+                    </div>
+                </div>
+
+                <div class="addSoldierSection">
+                    <div class="row">
+                        <input type="text" id="soldierName" placeholder="اسم العسكري" />
+                        <select id="soldierRank">
+                            <option value="Cadet">Cadet</option>
+                            <option value="Solo Cadet">Solo Cadet</option>
+                            <option value="Officer">Officer I</option>
+                            <option value="Officer II">Officer II</option>
+                            <option value="Officer III">Officer III</option>
+                            <option value="Senior Officer">Senior Officer</option>
+                            <option value="Sergeant">Sergeant</option>
+                            <option value="First Sergeant">First Sergeant</option>
+                            <option value="Staff Sergeant">Staff Sergeant</option>
+                            <option value="Lieutenant">Lieutenant</option>
+                            <option value="First Lieutenant">First Lieutenant</option>
+                        </select>
+                    </div>
+                    <button onclick="addSoldier()" class="btnAdd"><i class="fas fa-plus"></i> إضافة عسكري</button>
+                </div>
+
+                <div id="soldiersRankList" class="soldiersRankGrid" style="margin-top:15px;"></div>
+            </section>
+        </div>
+
+        <!-- ===== التبويب 5: رموز الدخول ===== -->
         <div id="tabAccess" class="tabContent">
             <section class="card">
                 <h2><i class="fas fa-key"></i> إدارة رموز الدخول</h2>
@@ -265,40 +429,25 @@
             </section>
         </div>
 
-        <!-- ===== التبويب 4: العساكر ===== -->
-        <div id="tabSoldiers" class="tabContent">
-            <section class="card">
-                <h2><i class="fas fa-user-plus"></i> إضافة عسكري</h2>
-                <div class="row">
-                    <input type="text" id="soldierName" placeholder="اسم العسكري" />
-                    <select id="soldierRank">
-                        <option value="Cadet">Cadet</option>
-                        <option value="Solo Cadet">Solo Cadet</option>
-                        <option value="Officer 1">Officer 1</option>
-                        <option value="Officer 2">Officer 2</option>
-                        <option value="Officer 3">Officer 3</option>
-                        <option value="Senior Officer">Senior Officer</option>
-                        <option value="Sergeant">Sergeant</option>
-                        <option value="First Sergeant">First Sergeant</option>
-                        <option value="Staff Sergeant">Staff Sergeant</option>
-                        <option value="Lieutenant">Lieutenant</option>
-                        <option value="First Lieutenant">First Lieutenant</option>
-                    </select>
-                </div>
-                <button onclick="addSoldier()" class="btnAdd"><i class="fas fa-plus"></i> إضافة</button>
-                <div id="soldierList" class="listBox"></div>
-            </section>
-        </div>
-
-        <!-- ===== التبويب 5: القضايا ===== -->
+        <!-- ===== التبويب 6: القضايا ===== -->
         <div id="tabComplaints" class="tabContent">
             <section class="card">
-                <h2><i class="fas fa-list"></i> القضايا المرفوعة</h2>
+                <h2><i class="fas fa-list"></i> القضايا</h2>
+                <p class="sub">عرض جميع القضايا المرفوعة</p>
+
+                <div class="complaintFilter">
+                    <button class="filterBtn active" onclick="filterComplaints('all')"><i class="fas fa-list"></i> الكل</button>
+                    <button class="filterBtn" onclick="filterComplaints('citizen')"><i class="fas fa-user"></i> المواطنين</button>
+                    <button class="filterBtn" onclick="filterComplaints('military')"><i class="fas fa-shield-alt"></i> العساكر</button>
+                    <button class="filterBtn" onclick="filterComplaints('claimed')"><i class="fas fa-check"></i> المستلمة</button>
+                    <button class="filterBtn" onclick="filterComplaints('unclaimed')"><i class="fas fa-clock"></i> غير المستلمة</button>
+                </div>
+
                 <div id="complaintList" class="listBox"></div>
             </section>
         </div>
 
-        <!-- ===== التبويب 6: الترقيات ===== -->
+        <!-- ===== التبويب 7: الترقيات ===== -->
         <div id="tabPromotions" class="tabContent">
             <section class="card">
                 <h2><i class="fas fa-arrow-up"></i> الترقيات</h2>
@@ -307,9 +456,9 @@
                     <select id="newRank">
                         <option value="Cadet">Cadet</option>
                         <option value="Solo Cadet">Solo Cadet</option>
-                        <option value="Officer 1">Officer 1</option>
-                        <option value="Officer 2">Officer 2</option>
-                        <option value="Officer 3">Officer 3</option>
+                        <option value="Officer">Officer I</option>
+                        <option value="Officer II">Officer II</option>
+                        <option value="Officer III">Officer III</option>
                         <option value="Senior Officer">Senior Officer</option>
                         <option value="Sergeant">Sergeant</option>
                         <option value="First Sergeant">First Sergeant</option>
@@ -323,7 +472,7 @@
             </section>
         </div>
 
-        <!-- ===== التبويب 7: المهام ===== -->
+        <!-- ===== التبويب 8: المهام ===== -->
         <div id="tabTasks" class="tabContent">
             <section class="card">
                 <h2><i class="fas fa-clipboard-list"></i> تعيين مهمة</h2>
@@ -334,7 +483,7 @@
             </section>
         </div>
 
-        <!-- ===== التبويب 8: التقييم ===== -->
+        <!-- ===== التبويب 9: التقييم ===== -->
         <div id="tabEvaluations" class="tabContent">
             <section class="card">
                 <h2><i class="fas fa-star"></i> التقييم الأسبوعي</h2>
@@ -351,7 +500,7 @@
             </section>
         </div>
 
-        <!-- ===== التبويب 9: عسكري الأسبوع ===== -->
+        <!-- ===== التبويب 10: عسكري الأسبوع ===== -->
         <div id="tabWinner" class="tabContent">
             <section class="card gold">
                 <h2><i class="fas fa-trophy"></i> عسكري الأسبوع</h2>
@@ -362,7 +511,7 @@
             </section>
         </div>
 
-        <!-- ===== التبويب 10: Discord ===== -->
+        <!-- ===== التبويب 11: Discord ===== -->
         <div id="tabDiscord" class="tabContent">
             <section class="card discord">
                 <h2><i class="fab fa-discord"></i> Discord</h2>
