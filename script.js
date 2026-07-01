@@ -12,15 +12,28 @@ const RANKS = [
 // ===== نظام الصلاحيات والرموز =====
 // ========================================
 
-const FULL_ACCESS_CODES = ["crimson25533", "crimson24243", "crimson44343"];
-const CMZ_CODES = ["cmz84556", "cmz84776"];
+// 🔴 كلمة المرور الكاملة (كل الصلاحيات)
+const FULL_ACCESS_PASSWORD = "crim578475";
 
+// 🟡 رموز بدون حذف (عرض + إضافة + تعديل - بدون حذف)
+const NO_DELETE_CODES = [
+    "cri5415454",  // U-11 | Tom Cross
+    "cri54144",    // U-20 | William Alenzi
+    "cri53254",    // U-21 | Mohammed Altamimi
+    "cri541444",   // U-25 | Alexander Foster
+    "cri541114",   // U-31 | Munijar Bin Kurdis
+    "cri54412"     // U-39 | Matrak AlShaibani
+];
+
+// بيانات أصحاب الرموز
 const CODE_USERS = {
-    "crimson25533": { name: "Roy Mark", id: "C-5" },
-    "crimson24243": { name: "Yahya Al-Shahrani", id: "U-3" },
-    "crimson44343": { name: "Marcus Foster", id: "U-0" },
-    "cmz84556": { name: "Sab Haitham", id: "C-8" },
-    "cmz84776": { name: "Tom Cross", id: "U-11" }
+    "crim578475": { name: "Marcus Foster", id: "U-0" },
+    "cri5415454": { name: "Tom Cross", id: "U-11" },
+    "cri54144": { name: "William Alenzi", id: "U-20" },
+    "cri53254": { name: "Mohammed Altamimi", id: "U-21" },
+    "cri541444": { name: "Alexander Foster", id: "U-25" },
+    "cri541114": { name: "Munijar Bin Kurdis", id: "U-31" },
+    "cri54412": { name: "Matrak AlShaibani", id: "U-39" }
 };
 
 // ========================================
@@ -100,14 +113,42 @@ const ALL_SOLDIERS = [
 
 let soldierStats = JSON.parse(localStorage.getItem('soldierStats')) || {};
 
-// متطلبات الترقيات
+// ========================================
+// ===== متطلبات الترقيات =====
+// ========================================
+
 const RANK_REQUIREMENTS = {
-    'Officer': { points: 250, hours: 15 },
-    'Officer II': { points: 400, hours: 15 },
-    'Officer III': { points: 600, hours: 20 },
-    'Senior Officer': { points: 900, hours: 20 },
-    'Sergeant': { points: 1100, hours: 20 },
-    'First Sergeant': { points: 1400, hours: 20 }
+    'Officer II': {
+        points: 1,
+        reports: 15,
+        hours: 15,
+        dispatch: 10,
+        requirements: ['ونقين']
+    },
+    'Officer III': {
+        points: 3,
+        reports: 20,
+        hours: 40,
+        dispatch: 15,
+        requirements: ['3 ونقات', 'دخول الأكاديمية']
+    },
+    'Senior Officer': {
+        reports: 30,
+        hours: 60,
+        dispatch: 25,
+        requirements: ['تقييم 3 كدت', 'دخول الشؤون']
+    },
+    'Sergeant': {
+        reports: 45,
+        hours: 80,
+        points: 4,
+        requirements: ['تقييم 6 كدت', '4 ونقات']
+    },
+    'First Sergeant': {
+        reports: 65,
+        hours: 100,
+        requirements: ['دورة الواتش كوماندر', 'جميع الونقات']
+    }
 };
 
 // ========================================
@@ -126,6 +167,7 @@ let currentUser = null;
 let currentUserCode = null;
 let isFullAccess = false;
 let isCmzAccess = false;
+let canDelete = false;
 let currentLoginMethod = 'password';
 let currentComplaintFilter = 'all';
 
@@ -145,7 +187,7 @@ function initSoldiers() {
     }
     soldiers.forEach(s => {
         if (!soldierStats[s.name]) {
-            soldierStats[s.name] = { points: 0, hours: 0, completed: [] };
+            soldierStats[s.name] = { points: 0, hours: 0, reports: 0, dispatch: 0, completed: [] };
         }
     });
     localStorage.setItem('soldierStats', JSON.stringify(soldierStats));
@@ -158,16 +200,32 @@ function initSoldiers() {
 function checkRankCompletion(soldier) {
     const requirements = RANK_REQUIREMENTS[soldier.rank];
     if (!requirements) return null;
+
+    const stats = soldierStats[soldier.name] || { points: 0, hours: 0, reports: 0, dispatch: 0 };
     
-    const stats = soldierStats[soldier.name] || { points: 0, hours: 0 };
-    const isComplete = stats.points >= requirements.points && stats.hours >= requirements.hours;
+    let isComplete = true;
+    let missingRequirements = [];
     
+    if (requirements.points !== undefined && stats.points < requirements.points) {
+        isComplete = false;
+        missingRequirements.push(`نقاط: ${stats.points}/${requirements.points}`);
+    }
+    if (requirements.reports !== undefined && stats.reports < requirements.reports) {
+        isComplete = false;
+        missingRequirements.push(`تقارير: ${stats.reports}/${requirements.reports}`);
+    }
+    if (requirements.hours !== undefined && stats.hours < requirements.hours) {
+        isComplete = false;
+        missingRequirements.push(`ساعات: ${stats.hours}/${requirements.hours}`);
+    }
+    if (requirements.dispatch !== undefined && stats.dispatch < requirements.dispatch) {
+        isComplete = false;
+        missingRequirements.push(`ديسباتش: ${stats.dispatch}/${requirements.dispatch}`);
+    }
+
     return {
         isComplete,
-        requiredPoints: requirements.points,
-        requiredHours: requirements.hours,
-        currentPoints: stats.points,
-        currentHours: stats.hours
+        missingRequirements: missingRequirements.join(' | ')
     };
 }
 
@@ -185,42 +243,55 @@ function renderSoldiersRankList() {
     }
 
     container.innerHTML = soldiers.map(s => {
-        const stats = soldierStats[s.name] || { points: 0, hours: 0 };
+        const stats = soldierStats[s.name] || { points: 0, hours: 0, reports: 0, dispatch: 0 };
         const rankCheck = checkRankCompletion(s);
         let statusHTML = '';
-        
+
         if (rankCheck) {
             if (rankCheck.isComplete) {
-                statusHTML = `<span class="soldierStatus status-complete">✅ مكتمل</span>`;
+                statusHTML = `<span class="soldierStatus status-complete">✅ مكتمل <button class="promoteBtn" onclick="requestPromotion('${s.name}')">طلب ترقية</button></span>`;
             } else {
-                statusHTML = `<span class="soldierStatus status-incomplete">⏳ ${rankCheck.currentPoints}/${rankCheck.requiredPoints} نقاط • ${rankCheck.currentHours}/${rankCheck.requiredHours} ساعات</span>`;
+                statusHTML = `<span class="soldierStatus status-incomplete">⏳ ${rankCheck.missingRequirements}</span>`;
             }
         }
 
         return `
-        <div class="soldierRankCard">
-            <div class="soldierInfo">
-                <span class="soldierName">${s.name}</span>
-                <span class="soldierRank">${s.rank}</span>
-                ${statusHTML}
-            </div>
-            <div class="soldierStats">
-                <div class="statItem">
-                    <i class="fas fa-star"></i>
-                    <span class="statLabel">النقاط</span>
-                    <input type="number" id="points_${s.id}" value="${stats.points || 0}" min="0" 
-                           onchange="updateSoldierStat(${s.id}, 'points', this.value)" ${isFullAccess ? '' : 'disabled'} />
+            <div class="soldierRankCard">
+                <div class="soldierInfo">
+                    <span class="soldierName">${s.name}</span>
+                    <span class="soldierRank">${s.rank}</span>
+                    ${statusHTML}
                 </div>
-                <div class="statItem">
-                    <i class="fas fa-clock"></i>
-                    <span class="statLabel">الساعات</span>
-                    <input type="number" id="hours_${s.id}" value="${stats.hours || 0}" min="0" step="0.5"
-                           onchange="updateSoldierStat(${s.id}, 'hours', this.value)" ${isFullAccess ? '' : 'disabled'} />
+                <div class="soldierStats">
+                    <div class="statItem">
+                        <i class="fas fa-star"></i>
+                        <span class="statLabel">النقاط</span>
+                        <input type="number" id="points_${s.id}" value="${stats.points || 0}" min="0" 
+                               onchange="updateSoldierStat(${s.id}, 'points', this.value)" ${canDelete ? '' : 'disabled'} />
+                    </div>
+                    <div class="statItem">
+                        <i class="fas fa-clock"></i>
+                        <span class="statLabel">الساعات</span>
+                        <input type="number" id="hours_${s.id}" value="${stats.hours || 0}" min="0" step="0.5"
+                               onchange="updateSoldierStat(${s.id}, 'hours', this.value)" ${canDelete ? '' : 'disabled'} />
+                    </div>
+                    <div class="statItem">
+                        <i class="fas fa-file-alt"></i>
+                        <span class="statLabel">التقارير</span>
+                        <input type="number" id="reports_${s.id}" value="${stats.reports || 0}" min="0"
+                               onchange="updateSoldierStat(${s.id}, 'reports', this.value)" ${canDelete ? '' : 'disabled'} />
+                    </div>
+                    <div class="statItem">
+                        <i class="fas fa-bolt"></i>
+                        <span class="statLabel">الديسباتش</span>
+                        <input type="number" id="dispatch_${s.id}" value="${stats.dispatch || 0}" min="0"
+                               onchange="updateSoldierStat(${s.id}, 'dispatch', this.value)" ${canDelete ? '' : 'disabled'} />
+                    </div>
+                    ${canDelete ? `<button class="del" onclick="deleteSoldier(${s.id})">✖</button>` : ''}
                 </div>
-                ${isFullAccess ? `<button class="del" onclick="deleteSoldier(${s.id})">✖</button>` : ''}
             </div>
-        </div>
-    `}).join('');
+        `;
+    }).join('');
 }
 
 // ========================================
@@ -228,7 +299,7 @@ function renderSoldiersRankList() {
 // ========================================
 
 function updateSoldierStat(id, type, value) {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية لتعديل الإحصائيات');
         return;
     }
@@ -237,14 +308,53 @@ function updateSoldierStat(id, type, value) {
     if (!soldier) return;
 
     if (!soldierStats[soldier.name]) {
-        soldierStats[soldier.name] = { points: 0, hours: 0 };
+        soldierStats[soldier.name] = { points: 0, hours: 0, reports: 0, dispatch: 0 };
     }
 
     const numValue = parseFloat(value) || 0;
     soldierStats[soldier.name][type] = numValue;
     localStorage.setItem('soldierStats', JSON.stringify(soldierStats));
 
+    // ✅ التحقق من اكتمال المتطلبات بعد التحديث
+    const rankCheck = checkRankCompletion(soldier);
+    if (rankCheck && rankCheck.isComplete) {
+        const discordMsg = `**🎉 اكتملت متطلبات الترقية!**\n` +
+            `👤 **العسكري:** ${soldier.name}\n` +
+            `🎖️ **الرتبة الحالية:** ${soldier.rank}\n` +
+            `📊 **جميع المتطلبات مكتملة**\n` +
+            `📢 **يستحق الترقية إلى الرتبة التالية**\n` +
+            `🛡️ نظام الشؤون الداخلية`;
+        
+        sendToDiscord(discordMsg);
+        alert(`🎉 ${soldier.name} أكمل جميع متطلبات الترقية!`);
+    }
+
     renderSoldiersRankList();
+}
+
+// ========================================
+// ===== طلب ترقية =====
+// ========================================
+
+function requestPromotion(name) {
+    const soldier = soldiers.find(s => s.name === name);
+    if (!soldier) return;
+
+    const rankCheck = checkRankCompletion(soldier);
+    if (!rankCheck || !rankCheck.isComplete) {
+        alert('❌ لم تكتمل جميع المتطلبات بعد');
+        return;
+    }
+
+    const discordMsg = `**⭐ طلب ترقية جديد**\n` +
+        `👤 **العسكري:** ${name}\n` +
+        `🎖️ **الرتبة الحالية:** ${soldier.rank}\n` +
+        `✅ **المتطلبات:** مكتملة\n` +
+        `📢 **يرجى مراجعة طلب الترقية**\n` +
+        `🛡️ نظام الشؤون الداخلية`;
+
+    sendToDiscord(discordMsg);
+    alert(`✅ تم إرسال طلب ترقية للعسكري ${name}`);
 }
 
 // ========================================
@@ -260,102 +370,35 @@ function switchTab(tabId) {
 }
 
 // ========================================
-// ===== اختيار نوع القضية =====
+// ===== تحديث القوائم المنسدلة =====
 // ========================================
 
-function selectComplaintType(type) {
-    document.querySelectorAll('.complaintTypeBtn').forEach(btn => btn.classList.remove('active'));
-    if (type === 'citizen') {
-        document.querySelector('.complaintTypeBtn:first-child').classList.add('active');
-        document.getElementById('citizenComplaintForm').style.display = 'block';
-        document.getElementById('militaryComplaintForm').style.display = 'none';
-    } else {
-        document.querySelector('.complaintTypeBtn:last-child').classList.add('active');
-        document.getElementById('citizenComplaintForm').style.display = 'none';
-        document.getElementById('militaryComplaintForm').style.display = 'block';
-    }
-}
-
-// ========================================
-// ===== رفع قضية =====
-// ========================================
-
-function submitPublicComplaint() {
-    const name = document.getElementById('citizenName').value.trim();
-    const type = document.getElementById('complaintType').value;
-    const desc = document.getElementById('complaintDesc').value.trim();
-    const status = document.getElementById('complaintStatus');
-
-    if (!name || !desc) {
-        status.className = 'statusMessage error';
-        status.innerHTML = '❌ الرجاء ملء الاسم والتفاصيل';
-        return;
-    }
-
-    complaints.push({
-        id: Date.now(),
-        name: name,
-        type: type,
-        desc: desc,
-        date: new Date().toLocaleString('ar-SA'),
-        status: 'قيد المراجعة',
-        claimedBy: null,
-        claimedAt: null,
-        complaintType: 'citizen',
-        isMilitary: false
+function updateSelects() {
+    const selectIds = ['promotionSoldier', 'evalSoldier'];
+    
+    selectIds.forEach(id => {
+        const sel = document.getElementById(id);
+        if (!sel) return;
+        
+        const currentValue = sel.value;
+        sel.innerHTML = '';
+        
+        if (soldiers.length === 0) {
+            sel.innerHTML = '<option value="">لا يوجد عساكر</option>';
+            return;
+        }
+        
+        soldiers.forEach(s => {
+            const option = document.createElement('option');
+            option.value = s.name;
+            option.textContent = s.name + ' (' + s.rank + ')';
+            sel.appendChild(option);
+        });
+        
+        if (currentValue && soldiers.find(s => s.name === currentValue)) {
+            sel.value = currentValue;
+        }
     });
-
-    localStorage.setItem('complaints', JSON.stringify(complaints));
-
-    document.getElementById('citizenName').value = '';
-    document.getElementById('complaintDesc').value = '';
-
-    status.className = 'statusMessage success';
-    status.innerHTML = '✅ تم رفع القضية بنجاح! سيتم مراجعتها';
-
-    if (document.getElementById('dashboard').style.display !== 'none') {
-        renderComplaints();
-        updateStats();
-    }
-}
-
-function submitMilitaryComplaint() {
-    const name = document.getElementById('militaryName').value.trim();
-    const type = document.getElementById('militaryComplaintType').value;
-    const desc = document.getElementById('militaryComplaintDesc').value.trim();
-    const status = document.getElementById('complaintStatus');
-
-    if (!name || !desc) {
-        status.className = 'statusMessage error';
-        status.innerHTML = '❌ الرجاء ملء الاسم والتفاصيل';
-        return;
-    }
-
-    complaints.push({
-        id: Date.now(),
-        name: name,
-        type: type,
-        desc: desc,
-        date: new Date().toLocaleString('ar-SA'),
-        status: 'قيد المراجعة',
-        claimedBy: null,
-        claimedAt: null,
-        complaintType: 'military',
-        isMilitary: true
-    });
-
-    localStorage.setItem('complaints', JSON.stringify(complaints));
-
-    document.getElementById('militaryName').value = '';
-    document.getElementById('militaryComplaintDesc').value = '';
-
-    status.className = 'statusMessage success';
-    status.innerHTML = '✅ تم رفع القضية العسكرية بنجاح! سيتم مراجعتها';
-
-    if (document.getElementById('dashboard').style.display !== 'none') {
-        renderComplaints();
-        updateStats();
-    }
 }
 
 // ========================================
@@ -363,22 +406,21 @@ function submitMilitaryComplaint() {
 // ========================================
 
 function initDefaultCodes() {
-    FULL_ACCESS_CODES.forEach(code => {
-        if (!accessCodes.find(a => a.code === code)) {
-            const userData = CODE_USERS[code];
-            accessCodes.push({
-                name: userData ? userData.name : code,
-                code: code,
-                expiry: "دائم",
-                created: new Date().toISOString().split('T')[0],
-                active: true,
-                fullAccess: true,
-                isCmz: false,
-                id: Date.now() + Math.random() * 1000
-            });
-        }
-    });
-    CMZ_CODES.forEach(code => {
+    // إضافة رموز الكاملة
+    if (!accessCodes.find(a => a.code === FULL_ACCESS_PASSWORD)) {
+        accessCodes.push({
+            name: "Marcus Foster",
+            code: FULL_ACCESS_PASSWORD,
+            expiry: "دائم",
+            created: new Date().toISOString().split('T')[0],
+            active: true,
+            fullAccess: true,
+            id: Date.now() + Math.random() * 1000
+        });
+    }
+    
+    // إضافة رموز بدون حذف
+    NO_DELETE_CODES.forEach(code => {
         if (!accessCodes.find(a => a.code === code)) {
             const userData = CODE_USERS[code];
             accessCodes.push({
@@ -388,16 +430,16 @@ function initDefaultCodes() {
                 created: new Date().toISOString().split('T')[0],
                 active: true,
                 fullAccess: false,
-                isCmz: true,
                 id: Date.now() + Math.random() * 1000
             });
         }
     });
+    
     localStorage.setItem('accessCodes', JSON.stringify(accessCodes));
 }
 
 function addAccessCode() {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية لإضافة رموز');
         return;
     }
@@ -415,15 +457,16 @@ function addAccessCode() {
         return;
     }
 
-    let expiryDate = expiry === 'permanent' ? 'دائم' : (() => { const d = new Date(); d.setDate(d.getDate() + parseInt(expiry)); return d.toISOString().split('T')[0]; })();
-
-    const isFull = code.startsWith('CRIMSON');
-    const isCmz = code.startsWith('CMZ');
+    let expiryDate = expiry === 'permanent' ? 'دائم' : (() => { const d = new Date();
+        d.setDate(d.getDate() + parseInt(expiry)); return d.toISOString().split('T')[0]; })();
 
     accessCodes.push({
-        name, code, expiry: expiryDate,
+        name,
+        code,
+        expiry: expiryDate,
         created: new Date().toISOString().split('T')[0],
-        active: true, fullAccess: isFull, isCmz: isCmz,
+        active: true,
+        fullAccess: false,
         id: Date.now()
     });
 
@@ -436,18 +479,18 @@ function addAccessCode() {
 }
 
 function deleteAccessCode(id) {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية لحذف الرموز');
         return;
     }
     const code = accessCodes.find(a => a.id === id);
     if (!code) return;
-    if (FULL_ACCESS_CODES.includes(code.code)) {
-        alert('❌ لا يمكن حذف رمز crimson الأساسي');
+    if (code.code === FULL_ACCESS_PASSWORD) {
+        alert('❌ لا يمكن حذف رمز كامل الصلاحية');
         return;
     }
     if (!confirm(`⚠️ هل تريد فصل ${code.name} نهائياً؟\nالرمز: ${code.code}\nلن يتمكن من الدخول مرة أخرى`)) return;
-    
+
     code.active = false;
     code.banned = true;
     localStorage.setItem('accessCodes', JSON.stringify(accessCodes));
@@ -459,7 +502,7 @@ function deleteAccessCode(id) {
 function renderAccessCodes() {
     const list = document.getElementById('accessList');
     if (!list) return;
-    if (!isFullAccess) {
+    if (!canDelete) {
         list.innerHTML = '<div class="listItem" style="border-color:#444;">🔒 غير مصرح لك بمشاهدة هذا القسم</div>';
         return;
     }
@@ -468,34 +511,33 @@ function renderAccessCodes() {
         return;
     }
     list.innerHTML = accessCodes.map(a => {
-        const isFull = FULL_ACCESS_CODES.includes(a.code);
-        const isCmz = CMZ_CODES.includes(a.code);
+        const isFull = a.code === FULL_ACCESS_PASSWORD;
         const isBanned = a.banned === true;
         let typeLabel = '🟡 محدود';
         if (isFull) typeLabel = '🔴 كامل';
-        else if (isCmz) typeLabel = '🟡 قضايا فقط';
         if (isBanned) typeLabel = '⛔ مطرود';
-        
+
         return `
-        <div class="listItem">
-            <div>
-                <strong>${a.name}</strong>
-                <span style="color:#ffd700;font-weight:700;margin:0 8px;">${a.code}</span>
-                ${typeLabel}
-                <span class="${a.active && (a.expiry === 'دائم' || a.expiry >= new Date().toISOString().split('T')[0]) ? 'status-active' : 'status-expired'}">
-                    ${isBanned ? '🚫 محظور' : a.active && (a.expiry === 'دائم' || a.expiry >= new Date().toISOString().split('T')[0]) ? '✅ نشط' : '⛔ موقف'}
-                </span>
-                <br><small style="color:#555;">صلاحية: ${a.expiry}</small>
+            <div class="listItem">
+                <div>
+                    <strong>${a.name}</strong>
+                    <span style="color:#ffd700;font-weight:700;margin:0 8px;">${a.code}</span>
+                    ${typeLabel}
+                    <span class="${a.active && (a.expiry === 'دائم' || a.expiry >= new Date().toISOString().split('T')[0]) ? 'status-active' : 'status-expired'}">
+                        ${isBanned ? '🚫 محظور' : a.active && (a.expiry === 'دائم' || a.expiry >= new Date().toISOString().split('T')[0]) ? '✅ نشط' : '⛔ موقف'}
+                    </span>
+                    <br><small style="color:#555;">صلاحية: ${a.expiry}</small>
+                </div>
+                ${!isFull && !isBanned ? `<button class="del" onclick="deleteAccessCode(${a.id})" title="فصل العضو">🚫</button>` : isBanned ? '<span style="color:#ff4444;font-size:12px;">🚫 محظور</span>' : '<span style="color:#555;font-size:12px;">محمي</span>'}
             </div>
-            ${!isFull && !isBanned ? `<button class="del" onclick="deleteAccessCode(${a.id})" title="فصل العضو">🚫</button>` : isBanned ? '<span style="color:#ff4444;font-size:12px;">🚫 محظور</span>' : '<span style="color:#555;font-size:12px;">محمي</span>'}
-        </div>
-    `}).join('');
+        `;
+    }).join('');
 }
 
 function renderAccessLog() {
     const list = document.getElementById('accessLog');
     if (!list) return;
-    if (!isFullAccess) {
+    if (!canDelete) {
         list.innerHTML = '<div class="listItem" style="border-color:#444;">🔒 غير مصرح لك بمشاهدة هذا القسم</div>';
         return;
     }
@@ -529,23 +571,45 @@ function adminLogin() {
     const pass = document.getElementById('passwordInput').value;
     const errorEl = document.getElementById('loginError');
 
-    if (pass === "crimson2024") {
-        currentUser = "المدير العام";
-        currentUserCode = "ADMIN";
+    // 🔴 التحقق من الرمز الكامل
+    if (pass === FULL_ACCESS_PASSWORD) {
+        const userData = CODE_USERS[FULL_ACCESS_PASSWORD];
+        currentUser = `${userData.id} | ${userData.name}`;
+        currentUserCode = "FULL";
         isFullAccess = true;
-        isCmzAccess = false;
+        canDelete = true;
 
-        document.getElementById('adminLoginScreen').style.display = 'none';
+        document.getElementById('loginPage').style.display = 'none';
         document.getElementById('dashboard').style.display = 'block';
         document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser} (🔴 كامل)`;
-        addLoginRecord(currentUser, 'دخول', 'ADMIN');
+        addLoginRecord(currentUser, 'دخول', 'FULL');
         errorEl.textContent = '';
         loadAll();
         updateUIBasedOnAccess();
         showWelcomeMessage(currentUser);
-    } else {
-        errorEl.textContent = '❌ كلمة المرور خاطئة';
+        return;
     }
+    
+    // 🟡 التحقق من رموز بدون حذف
+    if (NO_DELETE_CODES.includes(pass)) {
+        const userData = CODE_USERS[pass];
+        currentUser = `${userData.id} | ${userData.name}`;
+        currentUserCode = pass;
+        isFullAccess = false;
+        canDelete = false;
+
+        document.getElementById('loginPage').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser} (🟡 بدون حذف)`;
+        addLoginRecord(currentUser, 'دخول', pass);
+        errorEl.textContent = '';
+        loadAll();
+        updateUIBasedOnAccess();
+        showWelcomeMessage(currentUser);
+        return;
+    }
+
+    errorEl.textContent = '❌ كلمة المرور خاطئة';
 }
 
 function loginWithCode() {
@@ -557,69 +621,49 @@ function loginWithCode() {
         return;
     }
 
-    const codeData = accessCodes.find(a => a.code === inputCode);
-    if (!codeData) {
-        errorEl.textContent = '❌ رمز غير صحيح';
+    // 🔴 التحقق من الرمز الكامل
+    if (inputCode === FULL_ACCESS_PASSWORD) {
+        const userData = CODE_USERS[FULL_ACCESS_PASSWORD];
+        currentUser = `${userData.id} | ${userData.name}`;
+        currentUserCode = "FULL";
+        isFullAccess = true;
+        canDelete = true;
+
+        document.getElementById('loginPage').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser} (🔴 كامل)`;
+        addLoginRecord(currentUser, 'دخول', 'FULL');
+        errorEl.textContent = '';
+        loadAll();
+        updateUIBasedOnAccess();
+        showWelcomeMessage(currentUser);
         return;
     }
-    
-    if (codeData.banned === true) {
-        errorEl.textContent = '❌ تم حظر هذا الرمز من الدخول';
+
+    // 🟡 التحقق من رموز بدون حذف
+    if (NO_DELETE_CODES.includes(inputCode)) {
+        const userData = CODE_USERS[inputCode];
+        currentUser = `${userData.id} | ${userData.name}`;
+        currentUserCode = inputCode;
+        isFullAccess = false;
+        canDelete = false;
+
+        document.getElementById('loginPage').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser} (🟡 بدون حذف)`;
+        addLoginRecord(currentUser, 'دخول', inputCode);
+        errorEl.textContent = '';
+        loadAll();
+        updateUIBasedOnAccess();
+        showWelcomeMessage(currentUser);
         return;
     }
-    
-    if (!codeData.active) {
-        errorEl.textContent = '❌ هذا الرمز موقف';
-        return;
-    }
-    if (codeData.expiry !== 'دائم') {
-        const today = new Date().toISOString().split('T')[0];
-        if (today > codeData.expiry) {
-            errorEl.textContent = '❌ انتهت صلاحية الرمز';
-            codeData.active = false;
-            localStorage.setItem('accessCodes', JSON.stringify(accessCodes));
-            renderAccessCodes();
-            return;
-        }
-    }
 
-    const isFull = FULL_ACCESS_CODES.includes(inputCode) || inputCode.startsWith('crimson');
-    const isCmz = CMZ_CODES.includes(inputCode) || inputCode.startsWith('cmz');
-    const userData = CODE_USERS[inputCode];
-    const displayName = userData ? `${userData.id} | ${userData.name}` : codeData.name;
-
-    currentUser = displayName;
-    currentUserCode = inputCode;
-    isFullAccess = isFull;
-    isCmzAccess = isCmz;
-
-    document.getElementById('adminLoginScreen').style.display = 'none';
-    document.getElementById('dashboard').style.display = 'block';
-
-    let accessText = '🟡 محدود (عرض فقط)';
-    if (isFull) accessText = '🔴 كامل';
-    else if (isCmz) accessText = '🟡 استلام قضايا فقط';
-
-    document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser} (${accessText})`;
-    addLoginRecord(currentUser, 'دخول', inputCode);
-    errorEl.textContent = '';
-
-    accessLogs.push({
-        code: inputCode,
-        name: displayName,
-        time: new Date().toLocaleString('ar-SA'),
-        id: Date.now()
-    });
-    localStorage.setItem('accessLogs', JSON.stringify(accessLogs));
-    renderAccessLog();
-
-    loadAll();
-    updateUIBasedOnAccess();
-    showWelcomeMessage(currentUser);
+    errorEl.textContent = '❌ رمز غير صحيح';
 }
 
 // ========================================
-// ===== رسالة الترحيب (في الموقع فقط) =====
+// ===== رسالة الترحيب =====
 // ========================================
 
 function showWelcomeMessage(name) {
@@ -634,60 +678,34 @@ function showWelcomeMessage(name) {
 
     nameDisplay.textContent = cleanName;
     overlay.style.display = 'flex';
+    overlay.style.opacity = '1';
+    overlay.style.visibility = 'visible';
+    overlay.style.zIndex = '9999';
+
+    const now = new Date();
+    const timeStr = now.toLocaleString('ar-SA', { hour: '2-digit', minute: '2-digit', hour12: true });
+    const dateStr = now.toLocaleDateString('ar-SA');
+    
+    let accessLevel = '🟡 عرض فقط';
+    if (canDelete) {
+        accessLevel = '🔴 صلاحيات كاملة';
+    }
+    
+    sendToDiscord(
+        `**🎉 مرحباً بك في الشؤون الداخلية**\n` +
+        `👤 **العضو:** ${cleanName}\n` +
+        `⏰ **الساعة:** ${timeStr}\n` +
+        `📅 **التاريخ:** ${dateStr}\n` +
+        `${accessLevel}\n` +
+        `🛡️ نظام الشؤون الداخلية`
+    );
 }
 
 function closeWelcome() {
-    document.getElementById('welcomeOverlay').style.display = 'none';
-}
-
-// ========================================
-// ===== عرض القضية كاملة =====
-// ========================================
-
-function viewComplaint(id) {
-    const complaint = complaints.find(c => c.id === id);
-    if (!complaint) return;
-
-    const modal = document.getElementById('complaintModal');
-    const body = document.getElementById('complaintModalBody');
-
-    const isCitizen = complaint.complaintType === 'citizen' || complaint.isMilitary === false;
-    const statusLabel = complaint.claimedBy ? `📥 مستلمة من: ${complaint.claimedBy}` : '📤 قيد المراجعة';
-    const dateStr = complaint.date || 'غير محدد';
-
-    body.innerHTML = `
-        <div class="detailRow"><span class="detailLabel">👤 الاسم:</span><span class="detailValue">${complaint.name || 'غير محدد'}</span></div>
-        <div class="detailRow"><span class="detailLabel">🏷️ النوع:</span><span class="detailValue">${complaint.type || 'غير محدد'}</span></div>
-        <div class="detailRow"><span class="detailLabel">📂 التصنيف:</span><span class="detailValue">${isCitizen ? 'مواطن' : 'عسكري'}</span></div>
-        <div class="detailRow"><span class="detailLabel">📅 التاريخ:</span><span class="detailValue">${dateStr}</span></div>
-        <div class="detailRow"><span class="detailLabel">📌 الحالة:</span><span class="detailValue">${statusLabel}</span></div>
-        <div class="complaintFullDesc">
-            <strong>📝 التفاصيل الكاملة:</strong><br>
-            ${complaint.desc || 'لا توجد تفاصيل'}
-        </div>
-    `;
-
-    modal.style.display = 'flex';
-}
-
-function closeComplaintModal() {
-    document.getElementById('complaintModal').style.display = 'none';
-}
-
-// ========================================
-// ===== الخروج =====
-// ========================================
-
-function adminLogout() {
-    if (currentUser) {
-        addLoginRecord(currentUser, 'خروج', currentUserCode);
-    }
-    document.getElementById('dashboard').style.display = 'none';
-    document.getElementById('publicPage').style.display = 'block';
-    currentUser = null;
-    currentUserCode = null;
-    isFullAccess = false;
-    isCmzAccess = false;
+    const overlay = document.getElementById('welcomeOverlay');
+    overlay.style.display = 'none';
+    overlay.style.opacity = '0';
+    overlay.style.visibility = 'hidden';
 }
 
 // ========================================
@@ -734,248 +752,20 @@ function renderLoginLog() {
 }
 
 // ========================================
-// ===== عرض الصفحات =====
+// ===== الخروج =====
 // ========================================
 
-function showAdminLogin() {
-    document.getElementById('publicPage').style.display = 'none';
-    document.getElementById('adminLoginScreen').style.display = 'flex';
-}
-
-function showPublicPage() {
-    document.getElementById('adminLoginScreen').style.display = 'none';
+function adminLogout() {
+    if (currentUser) {
+        addLoginRecord(currentUser, 'خروج', currentUserCode);
+        sendToDiscord(`🔴 **خروج**\n👤 **${currentUser}** خرج من النظام`);
+    }
     document.getElementById('dashboard').style.display = 'none';
-    document.getElementById('publicPage').style.display = 'block';
+    document.getElementById('loginPage').style.display = 'flex';
     currentUser = null;
     currentUserCode = null;
     isFullAccess = false;
-    isCmzAccess = false;
-}
-
-// ========================================
-// ===== نظام استلام القضايا =====
-// ========================================
-
-function claimComplaint(id) {
-    if (!isCmzAccess && !isFullAccess) {
-        alert('❌ ليس لديك صلاحية لاستلام القضايا');
-        return;
-    }
-    const complaint = complaints.find(c => c.id === id);
-    if (!complaint) return;
-    if (complaint.claimedBy) {
-        alert(`❌ هذه القضية تم استلامها من قبل ${complaint.claimedBy}`);
-        return;
-    }
-
-    complaint.claimedBy = currentUser;
-    complaint.claimedAt = new Date().toLocaleString('ar-SA');
-    complaint.status = 'قيد المعالجة';
-
-    localStorage.setItem('complaints', JSON.stringify(complaints));
-    renderComplaints();
-    updateStats();
-    updateClaimedCount();
-
-    alert(`✅ تم استلام القضية بنجاح`);
-}
-
-function unclaimComplaint(id) {
-    if (!isCmzAccess && !isFullAccess) {
-        alert('❌ ليس لديك صلاحية لإلغاء استلام القضايا');
-        return;
-    }
-    const complaint = complaints.find(c => c.id === id);
-    if (!complaint) return;
-    if (complaint.claimedBy !== currentUser) {
-        alert('❌ هذه القضية ليست مستلمة من قبلك');
-        return;
-    }
-
-    complaint.claimedBy = null;
-    complaint.claimedAt = null;
-    complaint.status = 'قيد المراجعة';
-
-    localStorage.setItem('complaints', JSON.stringify(complaints));
-    renderComplaints();
-    updateStats();
-    updateClaimedCount();
-    alert(`✅ تم إلغاء استلام القضية`);
-}
-
-function deleteComplaint(id) {
-    if (!isFullAccess) {
-        alert('❌ ليس لديك صلاحية لحذف قضايا');
-        return;
-    }
-    if (!confirm('حذف القضية؟')) return;
-    complaints = complaints.filter(c => c.id !== id);
-    localStorage.setItem('complaints', JSON.stringify(complaints));
-    renderComplaints();
-    updateStats();
-    updateClaimedCount();
-}
-
-// ========================================
-// ===== تصفية وعرض القضايا =====
-// ========================================
-
-function filterComplaints(filter) {
-    currentComplaintFilter = filter;
-    document.querySelectorAll('.filterBtn').forEach(btn => btn.classList.remove('active'));
-    const btns = document.querySelectorAll('.filterBtn');
-    const filterMap = { 'all': 0, 'citizen': 1, 'military': 2, 'claimed': 3, 'unclaimed': 4 };
-    const index = filterMap[filter] || 0;
-    if (btns[index]) btns[index].classList.add('active');
-    renderComplaints();
-}
-
-function renderComplaints() {
-    const list = document.getElementById('complaintList');
-    if (!list) return;
-
-    let filteredComplaints = complaints;
-    if (currentComplaintFilter === 'citizen') filteredComplaints = complaints.filter(c => c.complaintType === 'citizen' || c.isMilitary === false);
-    else if (currentComplaintFilter === 'military') filteredComplaints = complaints.filter(c => c.complaintType === 'military' || c.isMilitary === true);
-    else if (currentComplaintFilter === 'claimed') filteredComplaints = complaints.filter(c => c.claimedBy);
-    else if (currentComplaintFilter === 'unclaimed') filteredComplaints = complaints.filter(c => !c.claimedBy);
-
-    if (!isFullAccess && !isCmzAccess) {
-        filteredComplaints = filteredComplaints.filter(c => !c.claimedBy || c.claimedBy === currentUser);
-    }
-
-    if (filteredComplaints.length === 0) {
-        list.innerHTML = '<div class="listItem" style="border-color:#444;">لا توجد قضايا</div>';
-        return;
-    }
-
-    list.innerHTML = filteredComplaints.slice().reverse().map(c => {
-        const isClaimed = c.claimedBy !== null && c.claimedBy !== undefined;
-        const isMine = c.claimedBy === currentUser;
-        const canClaim = (isFullAccess || isCmzAccess) && !isClaimed;
-        const canUnclaim = (isFullAccess || isCmzAccess) && isMine;
-        const isCitizen = c.complaintType === 'citizen' || c.isMilitary === false;
-
-        return `
-        <div class="listItem" style="border-color: ${isClaimed ? '#ffd700' : '#8b0000'}; flex-wrap:wrap;">
-            <div style="flex:1;min-width:150px;cursor:pointer;" onclick="viewComplaint(${c.id})">
-                <strong>${c.name}</strong> (${c.type})
-                <span class="complaintBadge ${isCitizen ? 'badge-citizen' : 'badge-military'}">${isCitizen ? 'مواطن' : 'عسكري'}</span>
-                <br><small>${c.desc.substring(0, 50)}${c.desc.length > 50 ? '...' : ''}</small>
-                <br><small style="color:#555;">${c.date}</small>
-                <br>
-                <span style="font-size:12px;color:${isClaimed ? '#ffd700' : '#00ff00'};">
-                    ${isClaimed ? `📥 مستلمة من: ${c.claimedBy}` : '📤 قيد المراجعة'}
-                </span>
-                ${isMine ? `<span style="font-size:12px;color:#ff4444;"> (أنت المستلم)</span>` : ''}
-            </div>
-            <div style="display:flex;gap:5px;flex-wrap:wrap;margin-top:5px;">
-                <button onclick="viewComplaint(${c.id})" style="background:#1e88e5;color:#fff;padding:4px 12px;font-size:12px;border:none;border-radius:6px;cursor:pointer;">📖 عرض</button>
-                ${canClaim ? `<button onclick="claimComplaint(${c.id})" style="background:#00a86b;color:#fff;padding:4px 12px;font-size:12px;border:none;border-radius:6px;cursor:pointer;">📥 استلم</button>` : ''}
-                ${canUnclaim ? `<button onclick="unclaimComplaint(${c.id})" style="background:#ff8c00;color:#fff;padding:4px 12px;font-size:12px;border:none;border-radius:6px;cursor:pointer;">↩️ إلغاء</button>` : ''}
-                ${isFullAccess ? `<button onclick="deleteComplaint(${c.id})" style="background:#ff0000;color:#fff;padding:4px 12px;font-size:12px;border:none;border-radius:6px;cursor:pointer;">✖</button>` : ''}
-            </div>
-        </div>
-    `}).join('');
-}
-
-// ========================================
-// ===== إحصائيات القضايا المستلمة =====
-// ========================================
-
-function updateClaimedCount() {
-    const claimedCounts = {};
-    complaints.forEach(c => {
-        if (c.claimedBy) {
-            if (!claimedCounts[c.claimedBy]) claimedCounts[c.claimedBy] = 0;
-            claimedCounts[c.claimedBy]++;
-        }
-    });
-
-    const statsDiv = document.getElementById('claimedStats');
-    if (statsDiv) {
-        if (Object.keys(claimedCounts).length === 0) {
-            statsDiv.innerHTML = '<div class="listItem" style="border-color:#444;">لا توجد قضايا مستلمة</div>';
-            return;
-        }
-        statsDiv.innerHTML = Object.entries(claimedCounts)
-            .map(([name, count]) => `<div class="listItem" style="border-color:#ffd700;"><strong>${name}</strong>: ${count} قضية</div>`)
-            .join('');
-    }
-}
-
-// ========================================
-// ===== سجل استلام القضايا (بحث) =====
-// ========================================
-
-function searchPersonComplaints() {
-    const searchName = document.getElementById('searchPersonName').value.trim();
-    const resultDiv = document.getElementById('complaintLogResult');
-
-    if (!searchName) {
-        resultDiv.innerHTML = '<div class="listItem" style="border-color:#444;">❌ الرجاء إدخال اسم للبحث</div>';
-        return;
-    }
-
-    const personComplaints = complaints.filter(c => c.claimedBy && c.claimedBy.includes(searchName));
-
-    if (personComplaints.length === 0) {
-        resultDiv.innerHTML = `<div class="listItem" style="border-color:#ffd700;">🔍 لا توجد قضايا مستلمة للشخص: ${searchName}</div>`;
-        return;
-    }
-
-    const total = personComplaints.length;
-    resultDiv.innerHTML = `
-        <div class="listItem" style="border-color:#00ff00;flex-wrap:wrap;">
-            <div style="flex:1;">
-                <strong>📊 ${searchName}</strong>
-                <span style="color:#ffd700;font-size:18px;font-weight:900;">${total}</span>
-                <span style="color:#888;">قضية مستلمة</span>
-            </div>
-        </div>
-        ${personComplaints.map(c => `
-            <div class="listItem" style="border-color:#8b0000;font-size:13px;cursor:pointer;" onclick="viewComplaint(${c.id})">
-                <span>📋 ${c.type}: ${c.desc.substring(0, 30)}...</span>
-                <span style="color:#888;font-size:11px;">${c.date}</span>
-            </div>
-        `).join('')}
-    `;
-}
-
-function showAllComplaintLog() {
-    const resultDiv = document.getElementById('complaintLogResult');
-    const allClaimed = complaints.filter(c => c.claimedBy);
-
-    if (allClaimed.length === 0) {
-        resultDiv.innerHTML = '<div class="listItem" style="border-color:#444;">لا توجد قضايا مستلمة</div>';
-        return;
-    }
-
-    const grouped = {};
-    allClaimed.forEach(c => {
-        if (!grouped[c.claimedBy]) grouped[c.claimedBy] = [];
-        grouped[c.claimedBy].push(c);
-    });
-
-    let html = '';
-    for (const [person, claims] of Object.entries(grouped)) {
-        html += `
-            <div class="listItem" style="border-color:#ffd700;flex-wrap:wrap;margin-bottom:5px;">
-                <div style="flex:1;">
-                    <strong>👤 ${person}</strong>
-                    <span style="color:#ffd700;font-size:16px;font-weight:900;">${claims.length}</span>
-                    <span style="color:#888;">قضية</span>
-                </div>
-            </div>
-            ${claims.map(c => `
-                <div class="listItem" style="border-color:#8b0000;font-size:12px;margin-right:20px;cursor:pointer;" onclick="viewComplaint(${c.id})">
-                    <span>📋 ${c.type}: ${c.desc.substring(0, 25)}...</span>
-                    <span style="color:#888;font-size:10px;">${c.date}</span>
-                </div>
-            `).join('')}
-        `;
-    }
-    resultDiv.innerHTML = html;
+    canDelete = false;
 }
 
 // ========================================
@@ -983,7 +773,7 @@ function showAllComplaintLog() {
 // ========================================
 
 function addSoldier() {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية لإضافة عساكر');
         return;
     }
@@ -1001,7 +791,8 @@ function addSoldier() {
     }
 
     soldiers.push({
-        name, rank,
+        name,
+        rank,
         joinDate: new Date().toLocaleString('ar-SA'),
         id: Date.now()
     });
@@ -1009,33 +800,35 @@ function addSoldier() {
     localStorage.setItem('soldiers', JSON.stringify(soldiers));
 
     if (!soldierStats[name]) {
-        soldierStats[name] = { points: 0, hours: 0 };
+        soldierStats[name] = { points: 0, hours: 0, reports: 0, dispatch: 0 };
     }
     localStorage.setItem('soldierStats', JSON.stringify(soldierStats));
 
     document.getElementById('soldierName').value = '';
 
     renderSoldiersRankList();
+    updateSelects();
     updateStats();
 
     alert(`✅ تم إضافة العسكري ${name} بنجاح`);
 }
 
 function deleteSoldier(id) {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية لحذف عساكر');
         return;
     }
     const s = soldiers.find(s => s.id === id);
     if (!s) return;
     if (!confirm(`❌ هل تريد حذف العسكري ${s.name}؟`)) return;
-    
+
     soldiers = soldiers.filter(s => s.id !== id);
     delete soldierStats[s.name];
     localStorage.setItem('soldiers', JSON.stringify(soldiers));
     localStorage.setItem('soldierStats', JSON.stringify(soldierStats));
-    
+
     renderSoldiersRankList();
+    updateSelects();
     updateStats();
 }
 
@@ -1044,7 +837,7 @@ function deleteSoldier(id) {
 // ========================================
 
 function promoteSoldier() {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية للترقيات');
         return;
     }
@@ -1075,12 +868,14 @@ function promoteSoldier() {
 
     renderPromotions();
     renderSoldiersRankList();
+    updateSelects();
 
+    sendToDiscord(`⭐ **ترقية**\n👤 **العسكري:** ${name}\n⬆️ **من:** ${s.rank} ← ${newRank}`);
     alert(`✅ تمت ترقية ${name} إلى ${newRank}`);
 }
 
 function deletePromotion(index) {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية لحذف الترقيات');
         return;
     }
@@ -1100,74 +895,12 @@ function renderPromotions() {
     list.innerHTML = promotions.slice().reverse().map((p, i) => {
         const realIndex = promotions.length - 1 - i;
         return `
-        <div class="listItem" style="border-color:#ffd700;">
-            <span><strong>${p.soldier}</strong> ${p.oldRank} → ${p.newRank}<br><small>${p.date}</small></span>
-            ${isFullAccess ? `<button class="del" onclick="deletePromotion(${realIndex})">✖</button>` : ''}
-        </div>
-    `}).join('');
-}
-
-// ========================================
-// ===== المهام =====
-// ========================================
-
-function assignTask() {
-    if (!isFullAccess) {
-        alert('❌ ليس لديك صلاحية لتعيين مهام');
-        return;
-    }
-
-    const soldier = document.getElementById('taskSoldier').value;
-    const desc = document.getElementById('taskDesc').value.trim();
-
-    if (!soldier) {
-        alert('❌ اختر عسكري أولاً');
-        return;
-    }
-    if (!desc) {
-        alert('❌ اكتب وصف المهمة');
-        return;
-    }
-
-    if (!tasks[soldier]) tasks[soldier] = [];
-    tasks[soldier].push({ desc, date: new Date().toLocaleString('ar-SA') });
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-    document.getElementById('taskDesc').value = '';
-    renderTasks();
-    updateStats();
-}
-
-function deleteTask(soldier, index) {
-    if (!isFullAccess) {
-        alert('❌ ليس لديك صلاحية لحذف مهام');
-        return;
-    }
-    tasks[soldier].splice(index, 1);
-    if (!tasks[soldier].length) delete tasks[soldier];
-    localStorage.setItem('tasks', JSON.stringify(tasks));
-    renderTasks();
-    updateStats();
-}
-
-function renderTasks() {
-    const soldier = document.getElementById('taskSoldier').value;
-    const list = document.getElementById('taskList');
-    if (!list) return;
-    if (!soldier) {
-        list.innerHTML = '<div class="listItem" style="border-color:#444;">اختر عسكري أولاً</div>';
-        return;
-    }
-    const ts = tasks[soldier] || [];
-    if (ts.length === 0) {
-        list.innerHTML = '<div class="listItem" style="border-color:#444;">لا توجد مهام</div>';
-        return;
-    }
-    list.innerHTML = ts.map((t, i) => `
-        <div class="listItem">
-            <span>📌 ${t.desc}<br><small>${t.date}</small></span>
-            ${isFullAccess ? `<button class="del" onclick="deleteTask('${soldier}', ${i})">✖</button>` : '<span style="color:#555;font-size:12px;">🔒</span>'}
-        </div>
-    `).join('');
+            <div class="listItem" style="border-color:#ffd700;">
+                <span><strong>${p.soldier}</strong> ${p.oldRank} → ${p.newRank}<br><small>${p.date}</small></span>
+                ${canDelete ? `<button class="del" onclick="deletePromotion(${realIndex})">✖</button>` : ''}
+            </div>
+        `;
+    }).join('');
 }
 
 // ========================================
@@ -1175,7 +908,7 @@ function renderTasks() {
 // ========================================
 
 function submitEvaluation() {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية لإضافة تقييمات');
         return;
     }
@@ -1191,24 +924,61 @@ function submitEvaluation() {
     const dispatch = parseInt(document.getElementById('dispatch').value) || 0;
     const score = parseInt(document.getElementById('score').value) || 0;
     const discipline = parseInt(document.getElementById('discipline').value) || 5;
+    const points = parseInt(document.getElementById('points').value) || 0;
 
-    const total = hours + (reports * 5) + dispatch + (score * 2) + discipline;
+    const total = hours + (reports * 5) + dispatch + (score * 2) + discipline + points;
     const week = getWeekNumber();
 
     evaluations.push({
-        soldier, hours, reports, dispatch, score, discipline, total, week,
+        soldier,
+        hours,
+        reports,
+        dispatch,
+        score,
+        discipline,
+        points,
+        total,
+        week,
         date: new Date().toLocaleString('ar-SA')
     });
 
+    if (!soldierStats[soldier]) {
+        soldierStats[soldier] = { points: 0, hours: 0, reports: 0, dispatch: 0 };
+    }
+    soldierStats[soldier].hours += hours;
+    soldierStats[soldier].reports += reports;
+    soldierStats[soldier].dispatch += dispatch;
+    soldierStats[soldier].points += points;
+    localStorage.setItem('soldierStats', JSON.stringify(soldierStats));
+
     localStorage.setItem('evaluations', JSON.stringify(evaluations));
     renderEvaluationLog();
+    renderSoldiersRankList();
     updateStats();
 
+    // ✅ التحقق من اكتمال المتطلبات بعد التقييم
+    const soldierObj = soldiers.find(s => s.name === soldier);
+    if (soldierObj) {
+        const rankCheck = checkRankCompletion(soldierObj);
+        if (rankCheck && rankCheck.isComplete) {
+            const discordMsg = `**🎉 اكتملت متطلبات الترقية!**\n` +
+                `👤 **العسكري:** ${soldier}\n` +
+                `🎖️ **الرتبة الحالية:** ${soldierObj.rank}\n` +
+                `📊 **جميع المتطلبات مكتملة**\n` +
+                `📢 **يستحق الترقية إلى الرتبة التالية**\n` +
+                `🛡️ نظام الشؤون الداخلية`;
+            
+            sendToDiscord(discordMsg);
+            alert(`🎉 ${soldier} أكمل جميع متطلبات الترقية!`);
+        }
+    }
+
+    sendToDiscord(`⭐ **تقييم جديد**\n👤 **العسكري:** ${soldier}\n📊 **المجموع:** ${total} نقطة`);
     alert(`✅ تم تقييم ${soldier}\nالمجموع: ${total} نقطة`);
 }
 
 function deleteEvaluation(index) {
-    if (!isFullAccess) {
+    if (!canDelete) {
         alert('❌ ليس لديك صلاحية لحذف التقييمات');
         return;
     }
@@ -1229,11 +999,12 @@ function renderEvaluationLog() {
     log.innerHTML = evaluations.slice().reverse().map((e, i) => {
         const realIndex = evaluations.length - 1 - i;
         return `
-        <div class="listItem" style="border-color:#ffd700;">
-            <span><strong>${e.soldier}</strong> - ${e.total} نقطة<br><small>الانضباط: ${e.discipline}</small></span>
-            ${isFullAccess ? `<button class="del" onclick="deleteEvaluation(${realIndex})">✖</button>` : ''}
-        </div>
-    `}).join('');
+            <div class="listItem" style="border-color:#ffd700;">
+                <span><strong>${e.soldier}</strong> - ${e.total} نقطة<br><small>الانضباط: ${e.discipline} | الونقات: ${e.points}</small></span>
+                ${canDelete ? `<button class="del" onclick="deleteEvaluation(${realIndex})">✖</button>` : ''}
+            </div>
+        `;
+    }).join('');
 }
 
 // ========================================
@@ -1255,13 +1026,17 @@ function calculateWinner() {
         grouped[e.soldier] += e.total;
     });
 
-    let winner = null, max = 0;
+    let winner = null,
+        max = 0;
     for (const [name, score] of Object.entries(grouped)) {
-        if (score > max) { max = score; winner = name; }
+        if (score > max) { max = score;
+            winner = name; }
     }
 
     document.getElementById('weeklyWinnerDisplay').innerHTML = `<span>🏆 ${winner} - ${max} نقطة</span>`;
     document.getElementById('weeklyWinner').textContent = winner || '-';
+    
+    sendToDiscord(`🏆 **عسكري الأسبوع**\n👤 **الفائز:** ${winner}\n📊 **النقاط:** ${max} نقطة`);
 }
 
 // ========================================
@@ -1284,89 +1059,44 @@ function getWeekNumber() {
 }
 
 function updateUIBasedOnAccess() {
-    const restrictedElements = [
-        document.querySelector('.btnAdd'), document.querySelector('.btnPromote'),
-        document.querySelector('.btnTask'), document.querySelector('.btnEval'),
+    const deleteElements = [
         document.querySelectorAll('.del'),
-        document.getElementById('soldierName'), document.getElementById('soldierRank'),
-        document.getElementById('taskDesc'),
-        document.querySelector('[data-tab="tabAccess"]')
+        document.querySelectorAll('.btnDelete')
     ];
 
-    if (isFullAccess) {
-        restrictedElements.forEach(el => {
+    if (canDelete) {
+        deleteElements.forEach(el => {
             if (el) {
                 if (el.length) {
-                    el.forEach(e => { e.style.display = ''; e.disabled = false; e.style.opacity = ''; e.style.cursor = ''; });
+                    el.forEach(e => { e.style.display = ''; e.disabled = false; });
                 } else {
-                    el.style.display = ''; el.disabled = false; el.style.opacity = ''; el.style.cursor = '';
+                    el.style.display = ''; el.disabled = false;
                 }
             }
         });
         document.querySelector('[data-tab="tabAccess"]').style.display = '';
         const msg = document.getElementById('accessRestrictionMsg');
         if (msg) msg.remove();
-    } else if (isCmzAccess) {
-        restrictedElements.forEach(el => {
-            if (el) {
-                if (el.length) {
-                    el.forEach(e => {
-                        if (e.tagName === 'BUTTON' || e.tagName === 'INPUT' || e.tagName === 'SELECT') {
-                            e.disabled = true;
-                            e.style.opacity = '0.5';
-                            e.style.cursor = 'not-allowed';
-                        }
-                    });
-                } else {
-                    if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-                        el.disabled = true;
-                        el.style.opacity = '0.5';
-                        el.style.cursor = 'not-allowed';
-                    }
-                }
-            }
-        });
-        document.querySelector('[data-tab="tabAccess"]').style.display = 'none';
-        const soldiersCard = document.querySelector('#tabSoldiers .card');
-        if (soldiersCard) {
-            let msg = document.getElementById('accessRestrictionMsg');
-            if (!msg) {
-                msg = document.createElement('div');
-                msg.id = 'accessRestrictionMsg';
-                msg.style.cssText = 'background:#2a1a1a;border:1px solid #8b0000;border-radius:8px;padding:12px;margin:10px 0;color:#ffaa00;text-align:center;';
-                msg.innerHTML = '🟡 صلاحيات محدودة - يمكنك استلام القضايا فقط';
-                soldiersCard.prepend(msg);
-            }
-        }
     } else {
-        restrictedElements.forEach(el => {
+        deleteElements.forEach(el => {
             if (el) {
                 if (el.length) {
-                    el.forEach(e => {
-                        if (e.tagName === 'BUTTON' || e.tagName === 'INPUT' || e.tagName === 'SELECT') {
-                            e.disabled = true;
-                            e.style.opacity = '0.5';
-                            e.style.cursor = 'not-allowed';
-                        }
-                    });
+                    el.forEach(e => { e.style.display = 'none'; });
                 } else {
-                    if (el.tagName === 'BUTTON' || el.tagName === 'INPUT' || el.tagName === 'SELECT') {
-                        el.disabled = true;
-                        el.style.opacity = '0.5';
-                        el.style.cursor = 'not-allowed';
-                    }
+                    el.style.display = 'none';
                 }
             }
         });
         document.querySelector('[data-tab="tabAccess"]').style.display = 'none';
+        
         const soldiersCard = document.querySelector('#tabSoldiers .card');
         if (soldiersCard) {
             let msg = document.getElementById('accessRestrictionMsg');
             if (!msg) {
                 msg = document.createElement('div');
                 msg.id = 'accessRestrictionMsg';
-                msg.style.cssText = 'background:#2a1a1a;border:1px solid #8b0000;border-radius:8px;padding:12px;margin:10px 0;color:#ffaa00;text-align:center;';
-                msg.innerHTML = '🟡 صلاحيات محدودة - عرض فقط (ممنوع الإضافة أو الحذف)';
+                msg.style.cssText = 'background:#1a2a4a;border:1px solid #1e88e5;border-radius:8px;padding:12px;margin:10px 0;color:#4fc3f7;text-align:center;';
+                msg.innerHTML = '🟡 صلاحيات بدون حذف - يمكنك الإضافة والتعديل لكن لا يمكنك الحذف';
                 soldiersCard.prepend(msg);
             }
         }
@@ -1394,12 +1124,62 @@ function loadAll() {
     renderLoginLog();
     updateStats();
     updateClaimedCount();
+    updateSelects();
+}
+
+// ========================================
+// ===== دوال وهمية =====
+// ========================================
+
+function renderTasks() {
+    const list = document.getElementById('taskList');
+    if (list) {
+        list.innerHTML = '<div class="listItem" style="border-color:#444;">لا توجد مهام</div>';
+    }
+}
+
+function renderComplaints() {
+    const list = document.getElementById('complaintList');
+    if (list) {
+        list.innerHTML = '<div class="listItem" style="border-color:#444;">لا توجد قضايا</div>';
+    }
+}
+
+function updateClaimedCount() {}
+
+async function sendToDiscord(message) {
+    const DISCORD_WEBHOOK_URL = "https://canary.discord.com/api/webhooks/1519311337241444676/ODFr2pGtqfSqbdfZZEcX9gsiiOtlr1L1UNThQerXI-PFkWNv2b1ofe98R-Y2DcUoQdeV";
+    if (!DISCORD_WEBHOOK_URL) {
+        console.log('⚠️ Webhook غير مضبوط');
+        return;
+    }
+    try {
+        await fetch(DISCORD_WEBHOOK_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                content: message,
+                username: '🛡️ Internal Affairs',
+                avatar_url: 'https://i.imgur.com/4M34hi2.png'
+            })
+        });
+        console.log('✅ تم الإرسال إلى ديسكورد');
+    } catch (e) {
+        console.log('❌ خطأ في الإرسال:', e);
+    }
+}
+
+function sendCustomMessage() {
+    const msg = document.getElementById('customDiscordMsg');
+    if (msg && msg.value) {
+        sendToDiscord(`**📢 رسالة مخصصة**\n${msg.value}`);
+        msg.value = '';
+    }
 }
 
 document.addEventListener('DOMContentLoaded', function() {
     initDefaultCodes();
     initSoldiers();
-    document.getElementById('taskSoldier')?.addEventListener('change', renderTasks);
     loadAll();
     updateDateTime();
     setInterval(updateDateTime, 1000);
