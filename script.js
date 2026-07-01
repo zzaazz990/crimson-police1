@@ -12,20 +12,17 @@ const RANKS = [
 // ===== نظام الصلاحيات والرموز =====
 // ========================================
 
-// 🔴 كلمة المرور الكاملة (كل الصلاحيات)
 const FULL_ACCESS_PASSWORD = "crim578475";
 
-// 🟡 رموز بدون حذف (عرض + إضافة + تعديل - بدون حذف)
 const NO_DELETE_CODES = [
-    "cri5415454",  // U-11 | Tom Cross
-    "cri54144",    // U-20 | William Alenzi
-    "cri53254",    // U-21 | Mohammed Altamimi
-    "cri541444",   // U-25 | Alexander Foster
-    "cri541114",   // U-31 | Munijar Bin Kurdis
-    "cri54412"     // U-39 | Matrak AlShaibani
+    "cri5415454",
+    "cri54144",
+    "cri53254",
+    "cri541444",
+    "cri541114",
+    "cri54412"
 ];
 
-// بيانات أصحاب الرموز
 const CODE_USERS = {
     "crim578475": { name: "Marcus Foster", id: "U-0" },
     "cri5415454": { name: "Tom Cross", id: "U-11" },
@@ -107,10 +104,6 @@ const ALL_SOLDIERS = [
     { name: "TURKI ABDULLAH", rank: "Officer" }
 ];
 
-// ========================================
-// ===== بيانات العساكر =====
-// ========================================
-
 let soldierStats = JSON.parse(localStorage.getItem('soldierStats')) || {};
 
 // ========================================
@@ -169,7 +162,6 @@ let isFullAccess = false;
 let isCmzAccess = false;
 let canDelete = false;
 let currentLoginMethod = 'password';
-let currentComplaintFilter = 'all';
 
 // ========================================
 // ===== تهيئة العساكر =====
@@ -315,7 +307,6 @@ function updateSoldierStat(id, type, value) {
     soldierStats[soldier.name][type] = numValue;
     localStorage.setItem('soldierStats', JSON.stringify(soldierStats));
 
-    // ✅ التحقق من اكتمال المتطلبات بعد التحديث
     const rankCheck = checkRankCompletion(soldier);
     if (rankCheck && rankCheck.isComplete) {
         const discordMsg = `**🎉 اكتملت متطلبات الترقية!**\n` +
@@ -402,11 +393,56 @@ function updateSelects() {
 }
 
 // ========================================
+// ===== حفظ واسترجاع الجلسة =====
+// ========================================
+
+function saveSession(user, code, fullAccess, canDelete) {
+    localStorage.setItem('session_user', JSON.stringify(user));
+    localStorage.setItem('session_code', code);
+    localStorage.setItem('session_fullAccess', JSON.stringify(fullAccess));
+    localStorage.setItem('session_canDelete', JSON.stringify(canDelete));
+}
+
+function loadSession() {
+    const user = localStorage.getItem('session_user');
+    const code = localStorage.getItem('session_code');
+    const fullAccess = JSON.parse(localStorage.getItem('session_fullAccess'));
+    const canDelete = JSON.parse(localStorage.getItem('session_canDelete'));
+    
+    return { user, code, fullAccess, canDelete };
+}
+
+function clearSession() {
+    localStorage.removeItem('session_user');
+    localStorage.removeItem('session_code');
+    localStorage.removeItem('session_fullAccess');
+    localStorage.removeItem('session_canDelete');
+}
+
+function checkSession() {
+    const session = loadSession();
+    if (session.user && session.user !== 'null') {
+        currentUser = session.user;
+        currentUserCode = session.code;
+        isFullAccess = session.fullAccess || false;
+        canDelete = session.canDelete || false;
+        
+        document.getElementById('loginPage').style.display = 'none';
+        document.getElementById('dashboard').style.display = 'block';
+        document.getElementById('currentUserDisplay').textContent = `👤 ${currentUser} (${canDelete ? '🔴 كامل' : '🟡 بدون حذف'})`;
+        
+        loadAll();
+        updateUIBasedOnAccess();
+        return true;
+    }
+    return false;
+}
+
+// ========================================
 // ===== رموز الدخول =====
 // ========================================
 
 function initDefaultCodes() {
-    // إضافة رموز الكاملة
     if (!accessCodes.find(a => a.code === FULL_ACCESS_PASSWORD)) {
         accessCodes.push({
             name: "Marcus Foster",
@@ -419,7 +455,6 @@ function initDefaultCodes() {
         });
     }
     
-    // إضافة رموز بدون حذف
     NO_DELETE_CODES.forEach(code => {
         if (!accessCodes.find(a => a.code === code)) {
             const userData = CODE_USERS[code];
@@ -571,7 +606,6 @@ function adminLogin() {
     const pass = document.getElementById('passwordInput').value;
     const errorEl = document.getElementById('loginError');
 
-    // 🔴 التحقق من الرمز الكامل
     if (pass === FULL_ACCESS_PASSWORD) {
         const userData = CODE_USERS[FULL_ACCESS_PASSWORD];
         currentUser = `${userData.id} | ${userData.name}`;
@@ -587,10 +621,10 @@ function adminLogin() {
         loadAll();
         updateUIBasedOnAccess();
         showWelcomeMessage(currentUser);
+        saveSession(currentUser, currentUserCode, isFullAccess, canDelete);
         return;
     }
     
-    // 🟡 التحقق من رموز بدون حذف
     if (NO_DELETE_CODES.includes(pass)) {
         const userData = CODE_USERS[pass];
         currentUser = `${userData.id} | ${userData.name}`;
@@ -606,6 +640,7 @@ function adminLogin() {
         loadAll();
         updateUIBasedOnAccess();
         showWelcomeMessage(currentUser);
+        saveSession(currentUser, currentUserCode, isFullAccess, canDelete);
         return;
     }
 
@@ -621,7 +656,6 @@ function loginWithCode() {
         return;
     }
 
-    // 🔴 التحقق من الرمز الكامل
     if (inputCode === FULL_ACCESS_PASSWORD) {
         const userData = CODE_USERS[FULL_ACCESS_PASSWORD];
         currentUser = `${userData.id} | ${userData.name}`;
@@ -637,10 +671,10 @@ function loginWithCode() {
         loadAll();
         updateUIBasedOnAccess();
         showWelcomeMessage(currentUser);
+        saveSession(currentUser, currentUserCode, isFullAccess, canDelete);
         return;
     }
 
-    // 🟡 التحقق من رموز بدون حذف
     if (NO_DELETE_CODES.includes(inputCode)) {
         const userData = CODE_USERS[inputCode];
         currentUser = `${userData.id} | ${userData.name}`;
@@ -656,6 +690,7 @@ function loginWithCode() {
         loadAll();
         updateUIBasedOnAccess();
         showWelcomeMessage(currentUser);
+        saveSession(currentUser, currentUserCode, isFullAccess, canDelete);
         return;
     }
 
@@ -766,6 +801,7 @@ function adminLogout() {
     currentUserCode = null;
     isFullAccess = false;
     canDelete = false;
+    clearSession();
 }
 
 // ========================================
@@ -956,7 +992,6 @@ function submitEvaluation() {
     renderSoldiersRankList();
     updateStats();
 
-    // ✅ التحقق من اكتمال المتطلبات بعد التقييم
     const soldierObj = soldiers.find(s => s.name === soldier);
     if (soldierObj) {
         const rankCheck = checkRankCompletion(soldierObj);
@@ -1180,6 +1215,12 @@ function sendCustomMessage() {
 document.addEventListener('DOMContentLoaded', function() {
     initDefaultCodes();
     initSoldiers();
+    
+    if (!checkSession()) {
+        document.getElementById('loginPage').style.display = 'flex';
+        document.getElementById('dashboard').style.display = 'none';
+    }
+    
     loadAll();
     updateDateTime();
     setInterval(updateDateTime, 1000);
